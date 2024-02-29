@@ -1,0 +1,938 @@
+
+options
+{
+  static = true;
+}
+PARSER_BEGIN(MyNewGrammar)
+package cmppp;
+import java.io.*;
+import nodes.*;
+import java.util.HashMap;
+
+public class MyNewGrammar
+{
+  static String s = null;
+  static HashMap<String,FunctionDef> functions = new HashMap<String,FunctionDef>();
+
+  public static void main(String args []) throws ParseException,FileNotFoundException
+  {
+    FileInputStream fis = new FileInputStream("D:/test.txt");
+    MyNewGrammar parser = new MyNewGrammar(fis);
+//    MyNewGrammar parser = new MyNewGrammar(System.in);
+    AbstractTreeNode n = start();
+    n.execute(new Context());
+   // String code = (String)n.convert(new Context());
+   // System.out.println(code);
+  }
+}
+
+PARSER_END(MyNewGrammar)
+
+SKIP :
+{
+  " "
+| "\r"
+| "\t"
+| "\n"
+}
+
+
+
+TOKEN:
+{
+
+  < PLUS : "+" >
+| < MINUS : "-" >
+| < MULTIPLY : "*" >
+| < DIVIDE : "/" >
+| < NUMBER : (["0"-"9"])+(("."(["0"-"9"])+)|(("e"|"E")("+"|"-")?(["0"-"9"])+))  >
+| < NUMBERINT : (["0"-"9"])+ >
+| < Assignment: ":=" >
+| < Semicolon: ";" >
+| < IF: "if" >
+| < ELSE: "else" >
+| < IFELSE : "else if">
+| < FOR : "for">
+| < WHILE : "while">
+| < DO : "do">
+| < SWITCH : "switch">
+| < BREAK : "break">
+| < CONTINUE : "continue">
+| < CASE : "case">
+| < DEFULT : "default">
+| < INT : "int">
+| < BOOL : "bool">
+| < FLOAT : "float" >
+| < DOUBLE: "double">
+| < STRING: "string">
+| < CHAR:"char" >
+| < LeftParenthesis : "(" >
+| < RightParenthesis : ")" >
+| < LeftBrace : "{" >
+| < RightBrace : "}" >
+| < InputEnd: "end" >
+| < Compare: ">" | "<" | "==" | ">="|"<="|"!=">
+//| < CMP: ">" | "<" | ">=" | "<=" | "=" | "<>" >
+| < ANDOR : "&" | "|"  >
+| < NOT : "!" >
+| < AND : "&&" >
+| < OR : "||" >
+| < READ: "read" >
+| < WRITE: "write" >
+| < TRUE : "true" >
+| < FALSE : "false">
+|< FUNC: "func" >
+| < STRINGValue :"'" ("" | < Id > | < NUMBER> | < NUMBERINT >)+ "'" >
+| < Id: ["a"-"z","A"-"Z"] ( ["a"-"z","A"-"Z","0"-"9"] )* >
+| < Cout:"cout<<" >
+| < Cin:"cin>>">
+| < st: "#"(["a"-"z"]|["A"-"Z"]|["0"-"9"])+ >
+
+}
+
+BlockNode start():
+{
+  BlockNode n = new BlockNode();
+  AbstractTreeNode c;
+}
+{
+  (
+    c = stmt() {n.addChild(c); }
+  )+< EOF >
+  {
+  System.out.println("Tree was built successfully!");
+    return n;
+  }
+}
+
+
+
+AbstractTreeNode stmt():
+{
+  AbstractTreeNode n = null;
+}
+{
+  try
+  {
+  (
+    n = ifStmt() |
+     n = whileStmt() |
+     n=dowhileStmt()|
+    n = forStmt()|
+      n = assignStmt() |
+       n = readStmt()
+      |  n = writeStmt()
+      | n=switchStatement()
+      |FuncDef()
+ |n=defAssign()
+ //|n=FuncCall()
+
+)
+}
+catch(ParseException e)
+{
+  System.out.println(e);
+  Token t;
+  do
+  {
+    t = getNextToken();
+  }
+  while(t.kind != Semicolon);
+}
+{
+  if (n == null)
+  	n = new BlockNode();
+  return n;
+}
+}
+
+ExpressionNode E():
+{
+
+  Token t = null;
+  ExpressionNode n1, n2 = null;
+  System.out.println("E()");
+}
+
+// < PLUS : "+" >
+//| < MINUS : "-" >
+//| < MULTIPLY : "*" >
+//| < DIVIDE : "/" >
+{
+  n1 = F() ((t = <PLUS > | t=< MINUS>) n2 = E() )?
+  {
+    if (t == null)
+    	return n1;
+    else
+    {
+
+      	ExpressionNode en = new ExpressionNode();
+      	en.addChild(n1);
+      	en.addChild(n2);
+      	en.setOperator(t.image);
+      	return en;
+    }
+  }
+}
+
+ExpressionNode F():
+{
+  Token t = null;
+  ExpressionNode n1,n2 = null;
+}
+{
+  n1 = N()((t=< MULTIPLY > | t=< DIVIDE>) n2 = F())?
+    {
+    if (t == null)
+    	return n1;
+    else
+    {
+      	ExpressionNode en = new ExpressionNode();
+      	en.addChild(n1);
+      	en.addChild(n2);
+      	en.setOperator(t.image);
+      	return en;
+    }
+  }
+}
+
+
+
+ExpressionNode N() :
+{
+  Token t1 = null, t2 = null,t=null;
+  ExpressionNode n = null;
+}
+{
+  (
+    t1 = < NUMBER > | t1=< NUMBERINT >
+
+
+ | < LeftParenthesis > n = E() < RightParenthesis >
+//   | LOOKAHEAD(2) n = FuncCall()
+  | t2 = < Id >
+  | t1 = < STRINGValue >
+  | t1=< TRUE>
+  | t1=< FALSE>
+  )
+ {
+    //System.out.println(s);
+    if (t1 != null)
+    {
+      ConstantNode cn = new ConstantNode();
+      // System.out.println(cn.getdefType());
+      if (s != null)
+      {
+        System.out.println(s);
+        if (s.equals("int"))
+        {
+          try
+          {
+            System.out.println("cast to int");
+            cn.setValue(Integer.parseInt(t1.image));
+          }
+          catch (NumberFormatException e)
+          {
+            System.out.println("this is not int");
+          }
+          s = null;
+        }
+        else if (s.equals("float"))
+        {
+          try
+          {
+            System.out.println("cast to float");
+            cn.setValue(Float.parseFloat(t1.image));
+          }
+          catch (NumberFormatException e)
+          {
+            System.out.println("this is not float");
+          }
+          s = null;
+        }
+        else if (s.equals("string"))
+        {
+//          System.out.println("cast to string");
+//          String ss;
+//          ss = t1.image;
+//         // String ww = ss.substring(0, ss.length());
+//          System.out.println(ss);
+//          cn.setValue(ss);
+
+          if(t1.image.startsWith("'"))
+            {System.out.println("cast to string");
+            cn.setValue(t1.image);}
+            else {
+
+             System.out.println("this is not string");
+            }
+
+          s = null;
+        }
+
+        else if (s.equals("bool"))
+        {
+
+                  if(t1.image.equals("true") || t1.image.equals("false") )
+                    {System.out.println("cast to bool");
+                    cn.setValue(t1.image);}
+                    else
+                    {
+                     System.out.println("this is not bool");
+                    }
+
+
+                  s = null;
+        }
+        else if (s.equals("double"))
+        {
+          try
+          {
+            cn.setValue(Double.parseDouble(t1.image));
+          }
+          catch (NumberFormatException e)
+          {
+            System.out.println("this is not double");
+          }
+          s = null;
+        }
+        else if (s.equals("char"))
+        {
+          String ss1 = t1.image;
+         // String ww = ss1.substring(1, ss1.length());
+          char ss;
+          if (ss1.length() == 3&&t1.image.startsWith("'"))
+          {
+            ss = ss1.charAt(0);
+            System.out.println(ss);
+            cn.setValue(ss);
+            s = null;
+          }
+          else
+          {
+            System.out.println("this is not char");
+          }
+          s = null;
+        }
+      }
+      else if (s == null)
+      {
+
+//     System.out.println("  undefined "+"you must define it");
+        if ((t1.image).contains("."))
+        {
+          // cn.setType("double");
+          cn.setValue(Double.parseDouble(t1.image));
+        }
+        else if (t1.image.startsWith("'"))
+        {
+          String ss;
+          ss = t1.image;
+          String ww = ss.substring(1, ss.length());
+          System.out.println(ww);
+          //cn.setType("string");
+          cn.setValue(ww);
+        }
+         else if (t1.image.equals("true"))
+                {
+                  //cn.setType("int");
+                  System.out.println("true");
+                  cn.setValue(t1.image);
+                }
+
+                 else if (t1.image.equals("false"))
+                        {
+                          //cn.setType("int");
+                          System.out.println("false");
+                          cn.setValue(t1.image);
+                        }
+        else if (!t1.image.contains("."))
+        {
+          //cn.setType("int");
+          System.out.println("int");
+          cn.setValue(Integer.parseInt(t1.image));
+        }
+      }
+      return cn;
+    }
+    else if (n != null)
+    return n;
+    else
+    {
+      System.out.println("variable");
+      // System.out.println(t2.image);
+      VariableNode vn = new VariableNode();
+      vn.setName(t2.image);
+      return vn;
+    }
+  }
+}
+
+
+IfNode ifStmt():
+{
+  IfNode res = new IfNode();
+  AbstractTreeNode n, nn;
+  AbstractTreeNode n1=null,nn1;
+  BlockNode cn = new BlockNode();
+   BlockNode cn1 = new BlockNode();
+    BlockNode cn2 = new BlockNode();
+  BlockNode en = null;
+   BlockNode en1 = null;
+   Token t1=null,t2=null;
+}
+{
+  < IF > <LeftParenthesis >n = condition()< RightParenthesis > < LeftBrace >
+  (
+
+    nn = stmt()
+    {
+      cn.addChild(nn);
+    }
+
+  )+
+   (t1=<BREAK> < Semicolon >
+        (
+            nn = stmt()
+                {
+                  cn1.addChild(nn);
+                }
+          )*
+        )?
+   {
+      if(t1!=null)
+      {res.breakk=false;
+      System.out.println("breaaaaaaaaaaaaak");
+      }
+      }
+
+
+       (t2=<CONTINUE> < Semicolon >
+        (
+             nn = stmt()  { cn1.addChild(nn);}
+          )*
+        )?
+            {
+            if(t2!=null)
+            {
+            System.out.println("cooooooooooooooooooo");
+            }
+            }
+
+  < RightBrace >
+  (
+   < IFELSE > <LeftParenthesis >{en1 = new BlockNode(); }n1= condition()< RightParenthesis > < LeftBrace >
+    (
+      nn1= stmt()
+      {
+        en1.addChild(nn1);
+      }
+    )+< RightBrace >
+
+  )?
+  (
+    < ELSE >< LeftBrace > {en = new BlockNode(); } ( nn = stmt() {en.addChild(nn); })+
+     < RightBrace >
+  )?
+
+//  < END >
+  {
+    res.addChild(n);
+    res.addChild(cn);
+     if (en1 != null)
+      {res.addChild(n1);
+      res.addChild(en1);}
+       if (en != null)
+           	res.addChild(en);
+
+       	if(t1!=null)
+          res.addChild(cn1);
+
+         if(t2!=null)
+          res.addChild(cn2);
+    return res;
+  }
+}
+
+WhileNode whileStmt():
+{
+  WhileNode wnode = new WhileNode();
+  BlockNode bnode = new BlockNode();
+  BlockNode bnode1 = new BlockNode();
+   BlockNode bnode2 = new BlockNode();
+  AbstractTreeNode n,s;
+  Token t1=null,t2=null;
+  System.out.println("while");
+}
+{
+
+  < WHILE ><LeftParenthesis > n = condition()< RightParenthesis >< LeftBrace>
+  (
+    s = stmt() { bnode.addChild(s); }
+  )+
+  (t1=<BREAK> < Semicolon >
+  (
+      s = stmt() { bnode1.addChild(s); }
+    )*
+  )?
+      {
+      if(t1!=null)
+      {wnode.f=false;
+      System.out.println("breaaaaaaaaaaaaak");
+      }
+      }
+
+       (t2=<CONTINUE> < Semicolon >
+        (
+            s = stmt() { bnode2.addChild(s); }
+          )*
+        )?
+            {
+            if(t2!=null)
+            {wnode.continu=false;
+            System.out.println("cooooooooooooooooooo");
+            }
+            }
+  < RightBrace>
+  {
+    wnode.addChild(n);
+    wnode.addChild(bnode);
+    if(t1!=null)
+    {
+     wnode.addChild(bnode1);
+    }
+
+    if(t2!=null)
+        {
+         wnode.addChild(bnode2);
+        }
+    return wnode;
+  }
+}
+
+
+
+DoWhileNode dowhileStmt():
+{
+  DoWhileNode wnode = new DoWhileNode();
+  BlockNode bnode = new BlockNode();
+  BlockNode bnode1 = new BlockNode();
+   BlockNode bnode2 = new BlockNode();
+  AbstractTreeNode n,s;
+  Token t1=null,t2=null;
+  System.out.println("Do while");
+}
+{
+<DO>< LeftBrace>
+(
+    s = stmt() { bnode.addChild(s); }
+  )+
+  (t1=<BREAK> < Semicolon >
+    (
+        s = stmt() { bnode1.addChild(s); }
+      )*
+    )?
+      {
+      if(t1!=null)
+      {wnode.f=false;
+      System.out.println("breaaaaaaaaaaaaak");
+      }
+      }
+
+       (t2=<CONTINUE> < Semicolon >
+        (
+            s = stmt() { bnode2.addChild(s); }
+          )*
+        )?
+            {
+            if(t2!=null)
+            {wnode.continu=false;
+            System.out.println("cooooooooooooooooooo");
+            }
+            }
+  < RightBrace>
+  < WHILE ><LeftParenthesis > n = condition()< RightParenthesis ><Semicolon>
+
+  {
+    wnode.addChild(n);
+    wnode.addChild(bnode);
+     if(t1!=null)
+        {
+         wnode.addChild(bnode1);
+        }
+    if(t2!=null)
+        {
+         wnode.addChild(bnode2);
+        }
+    return wnode;
+  }
+}
+
+
+
+FoorNode forStmt():
+{
+  FoorNode wnode = new FoorNode();
+  BlockNode bnode = new BlockNode();
+   BlockNode bnode1 = new BlockNode();
+   BlockNode bnode2 = new BlockNode();
+  AbstractTreeNode n=null,n1=null,n2=null,s;
+  Token t,t1=null,t2=null;
+  System.out.println("for");
+}
+{
+
+< FOR ><LeftParenthesis > (n1 =assignStmt() | <Semicolon>) (n = condition())? <Semicolon> (n2 =assignStmt())?< RightParenthesis >< LeftBrace>
+  (
+    s = stmt() { bnode.addChild(s); }
+  )+
+    (t1=<BREAK> < Semicolon >
+      (
+          s = stmt() { bnode1.addChild(s); }
+        )*
+      )?
+        {
+        if(t1!=null)
+        {wnode.f=false;
+        System.out.println("breaaaaaaaaaaaaak");
+        }
+        }
+       (t2=<CONTINUE> < Semicolon >
+        (
+            s = stmt() { bnode2.addChild(s); }
+          )*
+        )?
+            {
+            if(t2!=null)
+            {
+            System.out.println("cooooooooooooooooooo");
+            }
+            }
+  < RightBrace>
+  {
+  if(n1!=null){
+  wnode.addChild(n1);
+  }
+    else if(n1==null)//assign
+    {
+    System.out.println("000000000000000000000000000000000000");
+    wnode.selgetbool1(true);
+    n1=new FoorNode();
+    wnode.addChild(n1);
+    }
+//wnode.addChild(n1);
+if(n==null)//condation
+{
+System.out.println("7777777777777777777777777");
+n=new ConditionNode();
+wnode.selcondation(true);
+}
+    wnode.addChild(n);
+    if(n2!=null)//increment
+    {bnode.addChild(n2);}
+    wnode.addChild(bnode);
+    if(t1!=null)
+    {wnode.addChild(bnode1);}
+//    wnode.setincrement(t.image);
+      if(t2!=null)
+        {  wnode.addChild(bnode2);}
+    return wnode;
+  }
+}
+
+//ForNode forStmt():
+//{
+//  ForNode res = new ForNode();
+//  Token t,t1=null,t2=null;
+//  AbstractTreeNode n1,n2, n4 = null, tmp;
+//  BlockNode n3 = new BlockNode();
+//}
+//{
+//	< FOR > <LeftParenthesis >t = <Id >"=" n1 = E()< Semicolon>   n2 = E()< Semicolon>( n4 = E() (t1="--"| t1="++") )?
+//	< RightParenthesis >< LeftBrace>
+//	(
+//	  tmp = stmt() { n3.addChild(tmp); }
+//	)+
+//	 < RightBrace>
+//	{
+//	  res.addChild(n1);
+//	  res.addChild(n2);
+//	  res.addChild(n3);
+//	  res.setVarName(t.image);
+//	  res.setincrement(t1.image);
+//	  if (n4 != null)
+//	  	res.addChild(n4);
+//	  return res;
+//	}
+//}
+DefAssignNode defAssign() :
+{
+  Token t, t1 = null;
+  DefAssignNode anode = new DefAssignNode();
+  AbstractTreeNode n=null;
+  System.out.println("Define");
+}
+{
+  (
+    t1 = < INT >
+  | t1 = < FLOAT >
+  | t1 = < CHAR >
+  | t1 = < STRING >
+  | t1 = < DOUBLE >
+  |t1= <BOOL>
+  )
+
+t = < Id > < Semicolon >//////////////////////////////////////////////////////////////
+
+
+//   (t1=< INT > t=< Id > < Assignment > ( n =E()) < Semicolon >)
+
+//     (t1=< BOOL >  < Id > < Assignment >(comparebool()) < Semicolon >)|
+//     (t1=(< FLOAT > | <DOUBLE >)  t=< Id > < Assignment > (< NUMBER >| n =E()) < Semicolon >)|
+//     (t1=< STRING >  t=< Id > < Assignment > < STRINGValue > < Semicolon >)
+  {
+    s = t1.image;
+    anode.setVarName(t.image);
+
+  //  anode.definecheck(new Context(),t.image);
+
+
+return anode;
+  }
+}
+
+
+
+AssignNode assignStmt():
+{
+  Token t,t1=null;
+  AssignNode anode = new AssignNode();
+  AbstractTreeNode n;
+  System.out.println("AssignNode");
+}
+{
+//  (
+//    t1 = < INT >
+//  | t1 = < FLOAT >
+//  | t1 = < CHAR >
+//  | t1 = < STRING >
+//  | t1 = < DOUBLE >
+//  )
+	t = < Id > <Assignment > n =E() < Semicolon >
+	{
+	 System.out.println("N()");
+	  anode.setVarName(t.image);
+	  anode.addChild(n);
+	  return anode;
+	}
+}
+
+ReadNode readStmt():
+{
+  ReadNode n = new ReadNode();
+  AbstractTreeNode n2;
+  Token t;
+}
+{
+//	< RARROW > t=  <ID > <SEMI >
+< Cin > t=  <Id > < Semicolon >
+	{
+//	System.out.println("please cin ");
+//    Scanner s = new Scanner(System.in);
+//    System.out.println(varName +"="+ s.nextDouble());
+//    n2=s.nextDouble();
+//	n.setVarName(t.image);
+//	 n.addChild(n2);
+//	  return n;
+
+	n.setVarName(t.image);
+	  return n;
+
+	}
+}
+
+WriteNode writeStmt():
+{
+  WriteNode n = new WriteNode();
+  AbstractTreeNode nn;
+}
+{
+//	< LARROW > nn = E() < SEMI >
+< Cout > nn = N() < Semicolon >
+	{
+	  n.addChild(nn);
+	  return n;
+	}
+}
+
+ConditionNode condition():
+{
+  ConditionNode n = new ConditionNode();
+  AbstractTreeNode n1,n2,n3,n4,n5=null,n6=null;
+  Token t=null,t1;
+  Token boole,boole1=null;
+}
+{ (boole=< NOT > {n.addboole(boole.image); })?
+(  n1 = E()  (t = < Compare > | t=< AND > | t=< OR > |t=< NOT > ) n2 = E())
+ ( (boole=< AND >|boole=< OR >|boole=< NOT >)
+(n3 = E() t1 = < Compare > n4 = E())
+								{
+	  n.addboole(boole.image);//center
+	  n.addChild(n3);
+	  n.addChild(n4);
+	  n.addop(t1.image);})*
+
+//	  (n5 = N()  (boole1=< AND >|boole1=< OR >|boole1=< NOT >) n6 = N())?
+//	  {
+//	   n.addboole(boole1.image);//center
+//      	  n.addChild(n5);
+//      	  n.addChild(n6);
+//
+//	   }
+	{
+	  n.addChild(n1);
+	  n.addChild(n2);
+	  if(t!=null)
+	  n.addop(t.image);
+
+	  return n;
+	}
+}
+
+
+
+SwitchNode switchStatement():
+{
+  SwitchNode n = new SwitchNode();
+   AbstractTreeNode n1,n2,s;
+    BlockNode bnode = new BlockNode();
+   Token t,t1,t2=null,t3=null;
+}
+{
+
+< SWITCH > < LeftParenthesis > (t = <NUMBER > | t= < NUMBERINT > |t=< STRINGValue >)
+< RightParenthesis >
+  < LeftBrace >
+(< CASE > (t1 = <NUMBER > | t1= < NUMBERINT > |t1=< STRINGValue >)  ":"
+
+ (
+ //n.basicvalue=t.image;
+ //n.valueofcase(t1.image);
+ s = stmt() { bnode.addChild(s);
+  n.basicvalue=t.image;
+  n.valueofcase(t1.image);
+  }
+ )+
+ (t2=<BREAK> < Semicolon >)?
+ {
+ if(t2==null)
+ {n.valueofbreak("");}
+ if(t2!=null)
+ {n.valueofbreak(t2.image);}
+ t2=null;
+  n.addChild(s);
+
+ }
+ )+
+
+(< DEFULT> ":" (
+ s = stmt() { bnode.addChild(s);}
+
+)+
+{n.addChild(s);}
+)?
+< RightBrace >
+  {
+   // n.addChild(s);
+    return n;
+  }
+}
+
+//void switchStatement():
+//{Token t;
+//}
+//{
+//  < SWITCH > < LeftParenthesis > t=< Id >< RightParenthesis >
+//  < LeftBrace >
+//(< CASE > (<NUMBER > | < NUMBERINT >|< Id >|< STRINGValue >) ":" (allStatment())*  (<BREAK> < Semicolon >)?)+
+//
+//(< DEFULT> ":" (allStatment())+  (<BREAK> < Semicolon >)?)?
+//< RightBrace >
+//
+// { System.out.println("switch"); }
+//
+//}
+
+
+//scopenode scope():
+//{
+//  scopenode n1 = new scopenode();
+//  AbstractTreeNode n=null ;
+//}
+//{
+//   <LeftParenthesis >(
+//    n = stmt() {n1.addChild(n); }
+//  )+ < RightParenthesis >
+//  {
+//    return n1;
+//  }
+//}
+
+//
+void FuncDef():
+{
+  FunctionDef fd = new FunctionDef();
+  Token name,t = null;
+  BlockNode n = new BlockNode();
+  AbstractTreeNode an;
+  HashMap<String,FunctionDef> old=functions;
+  {
+
+  }
+  functions=new  HashMap<String,FunctionDef>();
+}
+{
+
+
+	< FUNC > name = <Id >
+	< LeftParenthesis > (t = < Id > {fd.getParams().add(t.image); }
+	("," t = < Id > {fd.getParams().add(t.image); } )*)? < RightParenthesis ><LeftBrace>
+	(
+	  an = stmt()
+		{
+		  n.addChild(an);
+		}
+	  ) *
+	<  RightBrace >
+	{
+	  fd.setName(name.image);
+	  fd.setRoot(n);
+	  fd.getfunctionin().push(functions);
+	  {
+
+	  }
+	  functions= old;
+	  functions.put(fd.getName(),fd);
+	}
+}
+
+
+
+FuncCallNode FuncCall():
+{
+  FuncCallNode node = new FuncCallNode();
+  Token t;
+  AbstractTreeNode n;
+}
+{
+
+  t = < Id > <LeftParenthesis >(n = E() {node.addChild(n); }
+  ("," n = E() {node.addChild(n); })*)? < RightParenthesis >< Semicolon >
+  {
+    node.setFunctionName(t.image);
+    node.setFunctions(functions);
+    return node;
+  }
+
+
+}

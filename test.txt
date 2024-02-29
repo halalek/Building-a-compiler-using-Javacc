@@ -1,0 +1,26 @@
+float sum;
+sum:=0;
+float avg;
+avg:=0;
+int i;
+int i1;
+
+string s;
+s :='EnterTheNumber';
+cout<<s;
+cin>>i1;
+int i2;
+int i3;
+int i4;
+int i5;
+
+i2:=2;
+i3:=2;
+i4:=2;
+i5:=2;
+for (i:=0 ; i< 5 ; i:=i+1;)
+{
+ cout<<i;
+}
+sum:=i1+i2+i3+i4+i5;
+avg:=sum/5;
